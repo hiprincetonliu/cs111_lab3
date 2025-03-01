@@ -23,9 +23,9 @@ The global lock is declared statically in the global scope. The lock is initiali
 ```shell
 ./hash-table-tester -t 8 -s 100000
 ```
-Version 1 is a little slower than the base version. This is because we have a single global lock for the hash table, meaning that multiple threads trying to access the hash table is completely redundant (since only one thread can modify the hash table at a time) and the program will waste time doing context switches (extra overhead) between these threads.
+Version 1 is a little slower than the base version. This is because we have a single global lock for the hash table, meaning that multiple threads trying to access the hash table is completely redundant (since only one thread can modify the hash table at a time) and the program will spend time doing context switches (extra overhead) between these threads to check if the lock is available.
 
-For example, 
+For example, ./hash-table-tester -t 8 -s 100000 on a 4 core machine yields a speed of 23,000,000 microseconds for the base hash table and a speed of 53,000,000 microseconds for the version 1 hash table.
 
 ## Second Implementation
 In the `hash_table_v2_add_entry` function, I used a pthread_mutex_t lock for each one of the 4096 hash table entries. If a thread is holding the lock for a specific hash table entry (Ex: index 1234), no other thread can modify that specific hash table entry (index 1234). However, to increase speed, other threads can modify other hash table entries if they are unlocked (if index 2345 is unlocked we can change it).
