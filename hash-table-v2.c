@@ -17,6 +17,7 @@ SLIST_HEAD(list_head, list_entry);
 
 struct hash_table_entry {
 	struct list_head list_head;
+	pthread_mutex_t entry_mutex; // MAYBE CHANGE TO STATIC
 };
 
 struct hash_table_v2 {
@@ -29,6 +30,13 @@ struct hash_table_v2 *hash_table_v2_create()
 	assert(hash_table != NULL);
 	for (size_t i = 0; i < HASH_TABLE_CAPACITY; ++i) {
 		struct hash_table_entry *entry = &hash_table->entries[i];
+
+		int rc = pthread_mutex_init(&entry->entry_mutex, NULL);
+		if (rc != 0) {
+			free(hash_table);
+			exit(rc);
+		}
+
 		SLIST_INIT(&entry->list_head);
 	}
 	return hash_table;
@@ -73,12 +81,20 @@ void hash_table_v2_add_entry(struct hash_table_v2 *hash_table,
                              uint32_t value)
 {
 	struct hash_table_entry *hash_table_entry = get_hash_table_entry(hash_table, key);
+	int rc = pthread_mutex_lock(&hash_table_entry->entry_mutex);
+	if (rc != 0) {
+		exit(rc);
+	}
 	struct list_head *list_head = &hash_table_entry->list_head;
 	struct list_entry *list_entry = get_list_entry(hash_table, key, list_head);
 
 	/* Update the value if it already exists */
 	if (list_entry != NULL) {
 		list_entry->value = value;
+		rc = pthread_mutex_unlock(&hash_table_entry->entry_mutex);
+		if (rc != 0) {
+			exit(rc);
+		}
 		return;
 	}
 
@@ -86,6 +102,10 @@ void hash_table_v2_add_entry(struct hash_table_v2 *hash_table,
 	list_entry->key = key;
 	list_entry->value = value;
 	SLIST_INSERT_HEAD(list_head, list_entry, pointers);
+	rc = pthread_mutex_unlock(&hash_table_entry->entry_mutex);
+	if (rc != 0) {
+		exit(rc);
+	}
 }
 
 uint32_t hash_table_v2_get_value(struct hash_table_v2 *hash_table,
@@ -102,12 +122,24 @@ void hash_table_v2_destroy(struct hash_table_v2 *hash_table)
 {
 	for (size_t i = 0; i < HASH_TABLE_CAPACITY; ++i) {
 		struct hash_table_entry *entry = &hash_table->entries[i];
+		int rc = pthread_mutex_lock(&entry->entry_mutex);
+		if (rc != 0) {
+			exit(rc);
+		}
 		struct list_head *list_head = &entry->list_head;
 		struct list_entry *list_entry = NULL;
 		while (!SLIST_EMPTY(list_head)) {
 			list_entry = SLIST_FIRST(list_head);
 			SLIST_REMOVE_HEAD(list_head, pointers);
 			free(list_entry);
+		}
+		rc = pthread_mutex_unlock(&entry->entry_mutex);
+		if (rc != 0) {
+			exit(rc);
+		}
+		rc = pthread_mutex_destroy(&entry->entry_mutex);
+		if (rc != 0) {
+			exit(rc);
 		}
 	}
 	free(hash_table);
