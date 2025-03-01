@@ -85,23 +85,20 @@ void hash_table_v2_add_entry(struct hash_table_v2 *hash_table,
 	if (rc != 0) {
 		exit(rc);
 	}
+
 	struct list_head *list_head = &hash_table_entry->list_head;
 	struct list_entry *list_entry = get_list_entry(hash_table, key, list_head);
 
 	/* Update the value if it already exists */
 	if (list_entry != NULL) {
 		list_entry->value = value;
-		rc = pthread_mutex_unlock(&hash_table_entry->entry_mutex);
-		if (rc != 0) {
-			exit(rc);
-		}
-		return;
+	} else {
+		list_entry = calloc(1, sizeof(struct list_entry));
+		list_entry->key = key;
+		list_entry->value = value;
+		SLIST_INSERT_HEAD(list_head, list_entry, pointers);
 	}
 
-	list_entry = calloc(1, sizeof(struct list_entry));
-	list_entry->key = key;
-	list_entry->value = value;
-	SLIST_INSERT_HEAD(list_head, list_entry, pointers);
 	rc = pthread_mutex_unlock(&hash_table_entry->entry_mutex);
 	if (rc != 0) {
 		exit(rc);
